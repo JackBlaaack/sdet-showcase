@@ -5,7 +5,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:algo": "node --test \"algo/**/*.test.ts\""
   },
   "license": "MIT",
   "devEngines": {
