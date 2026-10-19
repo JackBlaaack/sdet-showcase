@@ -1,1 +1,1 @@
-export const projectName = "sdet-showcase" as const;
+export const projectName = 'sdet-showcase' as const;

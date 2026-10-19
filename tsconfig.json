@@ -15,5 +15,5 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["src", "algo", "tests"]
+  "include": ["src", "clients", "utils", "algo", "playwright.config.ts"]
 }
