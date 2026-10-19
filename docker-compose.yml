@@ -1,0 +1,25 @@
+# Starts orders-sut from its own repository and runs the tests against it:
+#
+#   docker compose up --build --attach tests --exit-code-from tests
+#
+# SUT_DIR is the path to the orders-sut checkout (default: next to this repository).
+# SUT_BUGS selects its build: none (reference, the default here) or all (planted defects).
+# TEST_SCRIPT is the package.json script the container runs: test, test:api or test:ui.
+include:
+  - path: ${SUT_DIR:-../orders-sut}/docker-compose.yml
+
+services:
+  tests:
+    build: .
+    command: ['pnpm', '${TEST_SCRIPT:-test}']
+    environment:
+      BASE_URL: http://api:3000
+    depends_on:
+      api:
+        condition: service_healthy
+    # Chromium needs more shared memory than the Docker default of 64 MB.
+    ipc: host
+    volumes:
+      - ./playwright-report:/tests/playwright-report
+      - ./test-results:/tests/test-results
+      - ./allure-results:/tests/allure-results
