@@ -14,6 +14,9 @@
     "test:api": "playwright test --project=api",
     "test:ui": "playwright test --project=ui",
     "test:algo": "node --test \"algo/**/*.test.ts\"",
+    "test:docker": "sh scripts/test-docker.sh test",
+    "test:docker:api": "sh scripts/test-docker.sh test:api",
+    "test:docker:ui": "sh scripts/test-docker.sh test:ui",
     "report": "playwright show-report",
     "report:allure": "allure generate allure-results -o allure-report --clean",
     "report:allure:open": "allure open allure-report"
