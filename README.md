@@ -118,7 +118,7 @@ Repository secrets (Settings → Secrets and variables → Actions):
 | --- | --- |
 | `SUT_REPO_TOKEN` | Fine-grained personal access token with access to orders-sut only and the permission Contents: Read-only. orders-sut is private, and the token of the workflow cannot read other repositories. |
 | `TELEGRAM_BOT_TOKEN` | Token of the bot that sends the summary, from [@BotFather](https://t.me/BotFather). |
-| `TELEGRAM_CHAT_ID` | Chat the summary goes to. Send any message to the bot, then open `https://api.telegram.org/bot<token>/getUpdates` and take `message.chat.id`. |
+| `TELEGRAM_CHAT_ID` | Chat the summary goes to. Send any message to the bot, then open `https://api.telegram.org/bot<token>/getUpdates` and take `message.chat.id`; for a private chat it is your own user id. It is not the number before the colon in the bot token: that is the id of the bot, and Telegram rejects it with 403 "the bot can't send messages to the bot". |
 
 Without the Telegram secrets the summary is only printed in the log of the run, with a warning.
 
