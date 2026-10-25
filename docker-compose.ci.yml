@@ -19,6 +19,10 @@ services:
       cache_to:
         - type=gha,scope=orders-sut,mode=max
   payment-stub:
+    # orders-sut gives both services the image orders-sut:local. The containerd image
+    # store refuses a second export under the same name while the builds run at once,
+    # so in CI the stub gets an image name of its own.
+    image: orders-sut:local-payment-stub
     build:
       cache_from:
         - type=gha,scope=orders-sut
