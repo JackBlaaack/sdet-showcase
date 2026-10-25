@@ -2,7 +2,7 @@
 #
 #   COMPOSE_FILE=docker-compose.yml:docker-compose.ci.yml
 #
-# Needs a buildx builder with the docker-container driver and the Actions runtime
+# Needs the containerd image store in the Docker daemon and the Actions runtime
 # variables in the environment, both set up in .github/workflows/tests.yml.
 # api and payment-stub build the same image, so they read one cache and api writes it.
 services:
