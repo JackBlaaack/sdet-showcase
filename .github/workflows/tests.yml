@@ -42,9 +42,27 @@ jobs:
           token: ${{ secrets.SUT_REPO_TOKEN }}
           path: orders-sut
 
+      # The image layers are cached in the GitHub Actions cache (docker-compose.ci.yml).
+      # The BuildKit of the Docker daemon exports a cache only with the containerd image
+      # store, and it reads the credentials of the cache from runtime variables that run
+      # steps do not get.
+      - name: Switch Docker to the containerd image store
+        run: |
+          config=/etc/docker/daemon.json
+          current=$(sudo cat "$config" 2>/dev/null || echo '{}')
+          echo "daemon.json before: $current"
+          echo "$current" | jq '.features["containerd-snapshotter"] = true' | sudo tee "$config" > /dev/null
+          sudo systemctl restart docker
+          docker info --format 'Docker {{.ServerVersion}}, storage {{.Driver}} {{.DriverStatus}}'
+
+      - name: Expose the Actions runtime to BuildKit
+        uses: crazy-max/ghaction-github-runtime@v4
+
       - name: Run the tests against orders-sut
         id: tests
         working-directory: sdet-showcase
+        env:
+          COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
         run: sh scripts/test-docker.sh test
 
       - name: Upload the reports
