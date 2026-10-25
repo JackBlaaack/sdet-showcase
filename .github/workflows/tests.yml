@@ -1,5 +1,6 @@
 # Runs the API and UI tests against orders-sut on every pull request to main and on
-# every push to main, then sends a summary to Telegram.
+# every push to main, publishes the Allure report to GitHub Pages and sends a summary
+# to Telegram.
 #
 # Repository secrets:
 #   SUT_REPO_TOKEN       fine-grained token with read access to the contents of orders-sut
@@ -23,10 +24,13 @@ permissions:
   contents: read
 
 jobs:
+  # The name is the required status check of the ruleset on main.
   tests:
     name: API and UI tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      outcome: ${{ steps.tests.outcome }}
     steps:
       # Both repositories side by side, so docker-compose.yml finds orders-sut at its
       # default path ../orders-sut.
@@ -41,6 +45,10 @@ jobs:
           repository: ${{ github.repository_owner }}/orders-sut
           token: ${{ secrets.SUT_REPO_TOKEN }}
           path: orders-sut
+
+      - name: Test the CI scripts
+        working-directory: sdet-showcase
+        run: node --test "scripts/**/*.test.mjs"
 
       # The image layers are cached in the GitHub Actions cache (docker-compose.ci.yml).
       # The BuildKit of the Docker daemon exports a cache only with the containerd image
@@ -65,6 +73,16 @@ jobs:
           COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
         run: sh scripts/test-docker.sh test
 
+      # With the history of main the report shows its trend and marks new failures.
+      - name: Generate the Allure report
+        if: ${{ !cancelled() && steps.tests.outcome != 'skipped' }}
+        working-directory: sdet-showcase
+        env:
+          COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
+        run: |
+          sh scripts/report-site.sh fetch-history allure-history/history.jsonl
+          docker compose run --rm --no-deps tests pnpm report:allure
+
       - name: Upload the reports
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
@@ -73,16 +91,103 @@ jobs:
           path: |
             sdet-showcase/playwright-report
             sdet-showcase/allure-results
+            sdet-showcase/allure-report
+            sdet-showcase/allure-history
+            sdet-showcase/test-results/results.json
           if-no-files-found: ignore
           retention-days: 14
 
+  # The only job that can push, and no code of the pull request runs in it. Pull
+  # requests from forks get neither secrets nor a token that can push; their report
+  # stays in the artifact.
+  report:
+    name: Allure report and summary
+    needs: tests
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pages: read
+    # One push to gh-pages at a time, shared with report-cleanup.yml.
+    concurrency:
+      group: gh-pages
+      cancel-in-progress: false
+    steps:
+      - name: Check out sdet-showcase
+        uses: actions/checkout@v7
+
+      # Missing when the tests job failed before it produced anything.
+      - name: Download the reports
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: reports
+
+      # main goes to the root of the site, a pull request to pr/<number>/, other runs
+      # are not published.
+      - name: Choose where the report goes
+        id: target
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if [ -n "$PR_NUMBER" ]; then
+            target="pr/$PR_NUMBER"
+          elif [ "$GITHUB_REF" = refs/heads/main ]; then
+            target=.
+          else
+            target=
+          fi
+          owner=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
+          site="https://$owner.github.io/${GITHUB_REPOSITORY#*/}/"
+          echo "target=$target" >> "$GITHUB_OUTPUT"
+          case "$target" in
+            '') ;;
+            .) echo "url=$site" >> "$GITHUB_OUTPUT" ;;
+            *) echo "url=$site$target/" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Publish the report to GitHub Pages
+        id: publish
+        if: ${{ steps.target.outputs.target != '' && hashFiles('allure-report/index.html') != '' }}
+        env:
+          TARGET: ${{ steps.target.outputs.target }}
+        run: |
+          if [ "$TARGET" = . ]; then
+            sh scripts/report-site.sh publish allure-report . allure-history/history.jsonl
+          else
+            sh scripts/report-site.sh publish allure-report "$TARGET"
+          fi
+          echo "commit=$(git ls-remote origin refs/heads/gh-pages | cut -f1)" >> "$GITHUB_OUTPUT"
+
+      # Pages builds gh-pages after the push; until then the link opens the previous report.
+      - name: Wait for GitHub Pages
+        if: ${{ steps.publish.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT: ${{ steps.publish.outputs.commit }}
+        run: |
+          for _ in $(seq 36); do
+            if ! build=$(gh api "repos/$GITHUB_REPOSITORY/pages/builds/latest" --jq '"\(.status) \(.commit)"' 2> /dev/null); then
+              echo "::warning::GitHub Pages is not enabled for this repository"
+              exit 0
+            fi
+            case "$build" in
+              "built $COMMIT") echo "GitHub Pages serves $COMMIT"; exit 0 ;;
+              "errored $COMMIT") echo "::error::GitHub Pages failed to build $COMMIT"; exit 1 ;;
+            esac
+            sleep 5
+          done
+          echo "::warning::GitHub Pages has not built $COMMIT within 3 minutes"
+
       - name: Send the summary to Telegram
         if: ${{ !cancelled() }}
-        working-directory: sdet-showcase
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          TESTS_OUTCOME: ${{ steps.tests.outcome }}
+          TESTS_OUTCOME: ${{ needs.tests.outputs.outcome }}
+          REPORT_URL: ${{ steps.publish.outcome == 'success' && steps.target.outputs.url || '' }}
+          PUBLISH_OUTCOME: ${{ steps.publish.outcome }}
           HEAD_REF: ${{ github.head_ref || github.ref_name }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}

@@ -745,7 +745,7 @@ Expected: no output, exit code 0.
 Copy the working tree into the CI layout again, then:
 
 Run: `sh scripts/report-site.sh fetch-history allure-history/history.jsonl; sh scripts/test-docker.sh test && docker compose run --rm --no-deps tests pnpm report:allure && ls allure-report/index.html`
-Expected: `No history of main yet` (the copy is not a git clone, so a `fatal: not a git repository` line before it is expected here), `2 passed`, the file exists.
+Expected: `No history of main yet` (the copy is not a git clone, so `git ls-remote` takes `origin` for a path and prints `fatal: 'origin' does not appear to be a git repository` before it), `2 passed`, the file exists.
 
 - [ ] **Step 4: Commit**
 
