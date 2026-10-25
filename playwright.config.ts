@@ -15,6 +15,8 @@ export default defineConfig({
     ['list'],
     ['html', { open: 'never' }],
     ['allure-playwright', { resultsDir: 'allure-results' }],
+    // Read by scripts/notify-telegram.mjs to send the CI summary.
+    ['json', { outputFile: 'test-results/results.json' }],
   ],
   use: {
     baseURL,
