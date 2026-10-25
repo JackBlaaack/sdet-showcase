@@ -66,6 +66,12 @@ jobs:
       - name: Expose the Actions runtime to BuildKit
         uses: crazy-max/ghaction-github-runtime@v4
 
+      # Before Docker starts: Docker creates a missing directory of a bind mount as
+      # root, and the runner could not write the history into it afterwards.
+      - name: Copy the history of main
+        working-directory: sdet-showcase
+        run: sh scripts/report-site.sh fetch-history allure-history/history.jsonl
+
       - name: Run the tests against orders-sut
         id: tests
         working-directory: sdet-showcase
@@ -79,9 +85,7 @@ jobs:
         working-directory: sdet-showcase
         env:
           COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
-        run: |
-          sh scripts/report-site.sh fetch-history allure-history/history.jsonl
-          docker compose run --rm --no-deps tests pnpm report:allure
+        run: docker compose run --rm --no-deps tests pnpm report:allure
 
       - name: Upload the reports
         if: ${{ !cancelled() }}
