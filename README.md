@@ -124,6 +124,8 @@ The image layers are cached in the GitHub Actions cache. The workflow switches t
 - `main`: https://jackblaaack.github.io/sdet-showcase/, with the history of `main`.
 - A pull request: https://jackblaaack.github.io/sdet-showcase/pr/<number>/, the latest run of the pull request. Tests that fail there but passed on `main` are marked as new failures. The folder is removed when the pull request is closed (`.github/workflows/report-cleanup.yml`).
 
+The link in the Telegram summary carries the number of the run (`?run=<id>.<attempt>`): GitHub Pages lets a browser cache a page for 10 minutes, and without it a browser that opened the previous report of the same pull request would show that one again.
+
 `scripts/report-site.sh` keeps the reports on the `gh-pages` branch, which GitHub Pages serves. A failed test shows the error, the steps, a screenshot (UI tests), the snapshot of the page and, on the first retry, the Playwright trace: download it and open it at https://trace.playwright.dev or with `npx playwright show-trace`. The HTML report of Playwright in the `reports` artifact has the trace viewer built in.
 
 Allure 3 adds Google Analytics to the report (the Allure version and the id of the report, no test data); it has no option to turn it off.

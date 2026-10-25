@@ -140,11 +140,15 @@ jobs:
           fi
           owner=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
           site="https://$owner.github.io/${GITHUB_REPOSITORY#*/}/"
+          # Pages lets browsers cache a page for 10 minutes, and every run of a pull
+          # request publishes to the same address: a query string of its own per run
+          # keeps a browser from showing the previous report.
+          run="?run=$GITHUB_RUN_ID.$GITHUB_RUN_ATTEMPT"
           echo "target=$target" >> "$GITHUB_OUTPUT"
           case "$target" in
             '') ;;
-            .) echo "url=$site" >> "$GITHUB_OUTPUT" ;;
-            *) echo "url=$site$target/" >> "$GITHUB_OUTPUT" ;;
+            .) echo "url=$site$run" >> "$GITHUB_OUTPUT" ;;
+            *) echo "url=$site$target/$run" >> "$GITHUB_OUTPUT" ;;
           esac
 
       - name: Publish the report to GitHub Pages

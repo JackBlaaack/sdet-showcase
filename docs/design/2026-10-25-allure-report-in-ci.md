@@ -47,7 +47,7 @@ Every job that pushes to `gh-pages` uses `concurrency: gh-pages`, so two pushes 
 
 ### 3. Telegram summary
 
-`scripts/notify-telegram.mjs` gets the report URL and adds an "Allure report" link next to the link to the run. If publishing failed, the message says so and points to the artifact.
+`scripts/notify-telegram.mjs` gets the report URL and adds an "Allure report" link next to the link to the run. The URL ends with `?run=<run id>.<attempt>`: Pages sends `cache-control: max-age=600` and a pull request reuses its address, so without it a browser showed the cached report of the previous run (found on the first red run of the verification). If publishing failed, the message says so and points to the artifact.
 
 ### 4. Cleanup
 
