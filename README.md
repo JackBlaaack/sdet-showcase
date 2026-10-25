@@ -53,7 +53,7 @@ The application is at `http://localhost:3000` (Swagger UI at `/docs`), the payme
 | Contract tests | `GET /api/v1/orders/:id` against `GET /api/v2/orders/:id` | Planned |
 | Resilience | Payment failures and latency through the failure-injection flags, flaky-test tracking | Planned |
 | Performance | k6 scenarios: order creation against limited stock, order list under jitter | Planned |
-| CI and reporting | GitHub Actions with sharding, Allure report published to GitHub Pages | In progress: tests on every pull request and push to `main`, summary sent to Telegram |
+| CI and reporting | GitHub Actions with sharding, Allure report published to GitHub Pages | In progress: tests on every pull request and push to `main`, Allure report on GitHub Pages, summary sent to Telegram, merges to `main` only with green tests; sharding planned |
 | Defect reports | Findings from the build with planted defects, with reproduction steps | Planned |
 
 ## Getting started
@@ -73,10 +73,12 @@ pnpm typecheck
 Run the tests with the system under test up (see [Running the system under test](#running-the-system-under-test)):
 
 ```bash
-pnpm test:api   # API tests, no browser
-pnpm test:ui    # UI tests, Chromium
-pnpm test       # both projects
-pnpm report     # open the HTML report of the last run
+pnpm test:api             # API tests, no browser
+pnpm test:ui              # UI tests, Chromium
+pnpm test                 # both projects
+pnpm report               # open the HTML report of the last run
+pnpm report:allure        # Allure report of the last run in allure-report/
+pnpm report:allure:open   # open it
 ```
 
 The tests target `http://localhost:3000`; set `BASE_URL` to use another instance.
@@ -98,21 +100,37 @@ How it fits together:
 - The reference build is used (`SUT_BUGS=none`). Run `SUT_BUGS=all pnpm test:docker` for the build with planted defects.
 - `scripts/test-docker.sh` runs `docker compose up --exit-code-from tests`, then `docker compose down`, and exits with the code of the tests, so it can gate CI.
 - The SUT binds ports 3000, 4000 and 5432 on the host: stop an orders-sut started on its own (`docker compose down` in its directory) before a run.
-- `playwright-report/`, `test-results/` and `allure-results/` are mounted from the host, so `pnpm report` and `pnpm report:allure` work after a run.
+- `playwright-report/`, `test-results/`, `allure-results/`, `allure-report/` and `allure-history/` are mounted from the host, so `pnpm report` and `pnpm report:allure` work after a run, on the host or with `docker compose run --rm --no-deps tests pnpm report:allure`.
 - The image is `mcr.microsoft.com/playwright` with the same version as `@playwright/test`: bump the tag in `Dockerfile` together with the package.
 
 ## Continuous integration
 
-`.github/workflows/tests.yml` runs both projects on every pull request to `main`, on every push to `main` and on demand (Run workflow in the Actions tab):
+`.github/workflows/tests.yml` runs both projects on every pull request to `main`, on every push to `main` and on demand (Run workflow in the Actions tab). The job `API and UI tests`:
 
 1. Checks out this repository and orders-sut side by side, so `docker-compose.yml` finds the SUT at its default path.
-2. Runs `scripts/test-docker.sh test` against the reference build, the same command as `pnpm test:docker`.
-3. Uploads `playwright-report/` and `allure-results/` as the `reports` artifact of the run (kept 14 days).
-4. Sends a summary to Telegram with `scripts/notify-telegram.mjs`: the result, the pull request or commit, passed, failed, flaky and skipped counts, up to ten failed tests and a link to the run. It reads `test-results/results.json`, written by the JSON reporter in `playwright.config.ts`.
+2. Tests the CI scripts (`pnpm test:scripts`).
+3. Runs `scripts/test-docker.sh test` against the reference build, the same command as `pnpm test:docker`.
+4. Generates the Allure report inside the tests image (`pnpm report:allure`) with the history of `main`.
+5. Uploads `playwright-report/`, `allure-results/`, `allure-report/`, `allure-history/` and `test-results/results.json` as the `reports` artifact of the run (kept 14 days).
+
+The job `Allure report and summary` then publishes the Allure report to GitHub Pages and sends a summary to Telegram with `scripts/notify-telegram.mjs`: the result, the pull request or commit, passed, failed, flaky and skipped counts, up to ten failed tests, a link to the Allure report and a link to the run. The counts come from `test-results/results.json`, written by the JSON reporter in `playwright.config.ts`. It is the only job that can push, and no code of the pull request runs in it.
 
 A new commit in a pull request cancels the run for the previous one.
 
 The image layers are cached in the GitHub Actions cache. The workflow switches the Docker daemon of the runner to the containerd image store, whose BuildKit can export a cache, and adds `docker-compose.ci.yml` to `docker-compose.yml` through `COMPOSE_FILE`; local runs do not use it. With a warm cache a run takes about 13 seconds less. Pull requests read the cache of `main`, and GitHub removes entries that are not used for 7 days: the first run after a pause, or after a change of a Dockerfile, the lockfile or the Playwright image, builds without the cache and takes longer, because it also uploads the new cache.
+
+### Allure report
+
+- `main`: https://jackblaaack.github.io/sdet-showcase/, with the history of `main`.
+- A pull request: https://jackblaaack.github.io/sdet-showcase/pr/<number>/, the latest run of the pull request. Tests that fail there but passed on `main` are marked as new failures. The folder is removed when the pull request is closed (`.github/workflows/report-cleanup.yml`).
+
+`scripts/report-site.sh` keeps the reports on the `gh-pages` branch, which GitHub Pages serves. A failed test shows the error, the steps, a screenshot (UI tests), the snapshot of the page and, on the first retry, the Playwright trace: download it and open it at https://trace.playwright.dev or with `npx playwright show-trace`. The HTML report of Playwright in the `reports` artifact has the trace viewer built in.
+
+Allure 3 adds Google Analytics to the report (the Allure version and the id of the report, no test data); it has no option to turn it off.
+
+`main` accepts changes only through pull requests whose `API and UI tests` check passed (a repository ruleset).
+
+### Secrets
 
 Repository secrets (Settings → Secrets and variables → Actions):
 
@@ -164,6 +182,7 @@ algo/           algorithm practice solutions
 docs/
   test-design/  checklists, decision tables, state models
   bug-reports/  defects found, with reproduction steps
+  design/       design notes and implementation plans
 .github/
   workflows/    CI pipelines
 ```
