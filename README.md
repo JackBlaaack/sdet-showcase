@@ -112,6 +112,8 @@ How it fits together:
 
 A new commit in a pull request cancels the run for the previous one.
 
+The image layers are cached in the GitHub Actions cache. The workflow switches the Docker daemon of the runner to the containerd image store, whose BuildKit can export a cache, and adds `docker-compose.ci.yml` to `docker-compose.yml` through `COMPOSE_FILE`; local runs do not use it. With a warm cache a run takes about 13 seconds less. Pull requests read the cache of `main`, and GitHub removes entries that are not used for 7 days: the first run after a pause, or after a change of a Dockerfile, the lockfile or the Playwright image, builds without the cache and takes longer, because it also uploads the new cache.
+
 Repository secrets (Settings → Secrets and variables → Actions):
 
 | Secret | What it is |
