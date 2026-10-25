@@ -1,0 +1,73 @@
+# Runs the API and UI tests against orders-sut on every pull request to main and on
+# every push to main, then sends a summary to Telegram.
+#
+# Repository secrets:
+#   SUT_REPO_TOKEN       fine-grained token with read access to the contents of orders-sut
+#   TELEGRAM_BOT_TOKEN   bot that sends the summary
+#   TELEGRAM_CHAT_ID     chat the summary goes to
+name: Tests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A new commit in a pull request cancels the run of the previous one; runs on main all finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: API and UI tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Both repositories side by side, so docker-compose.yml finds orders-sut at its
+      # default path ../orders-sut.
+      - name: Check out sdet-showcase
+        uses: actions/checkout@v7
+        with:
+          path: sdet-showcase
+
+      - name: Check out orders-sut
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ github.repository_owner }}/orders-sut
+          token: ${{ secrets.SUT_REPO_TOKEN }}
+          path: orders-sut
+
+      - name: Run the tests against orders-sut
+        id: tests
+        working-directory: sdet-showcase
+        run: sh scripts/test-docker.sh test
+
+      - name: Upload the reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports
+          path: |
+            sdet-showcase/playwright-report
+            sdet-showcase/allure-results
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Send the summary to Telegram
+        if: ${{ !cancelled() }}
+        working-directory: sdet-showcase
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TESTS_OUTCOME: ${{ steps.tests.outcome }}
+          HEAD_REF: ${{ github.head_ref || github.ref_name }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          BASE_REF: ${{ github.base_ref }}
+        run: node scripts/notify-telegram.mjs
