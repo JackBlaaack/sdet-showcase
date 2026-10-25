@@ -42,9 +42,20 @@ jobs:
           token: ${{ secrets.SUT_REPO_TOKEN }}
           path: orders-sut
 
+      # The image layers are cached in the GitHub Actions cache (docker-compose.ci.yml).
+      # Exporting a cache needs the docker-container driver, and BuildKit reads the
+      # credentials of the cache from runtime variables that run steps do not get.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Expose the Actions runtime to BuildKit
+        uses: crazy-max/ghaction-github-runtime@v4
+
       - name: Run the tests against orders-sut
         id: tests
         working-directory: sdet-showcase
+        env:
+          COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
         run: sh scripts/test-docker.sh test
 
       - name: Upload the reports

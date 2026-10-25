@@ -1,0 +1,24 @@
+# CI only: keeps the build cache of the images in the GitHub Actions cache.
+#
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.ci.yml
+#
+# Needs a buildx builder with the docker-container driver and the Actions runtime
+# variables in the environment, both set up in .github/workflows/tests.yml.
+# api and payment-stub build the same image, so they read one cache and api writes it.
+services:
+  tests:
+    build:
+      cache_from:
+        - type=gha,scope=tests
+      cache_to:
+        - type=gha,scope=tests,mode=max
+  api:
+    build:
+      cache_from:
+        - type=gha,scope=orders-sut
+      cache_to:
+        - type=gha,scope=orders-sut,mode=max
+  payment-stub:
+    build:
+      cache_from:
+        - type=gha,scope=orders-sut
