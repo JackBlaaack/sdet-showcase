@@ -1,6 +1,6 @@
 # Allure report in CI
 
-Date: 2026-10-25. Status: approved, not implemented yet.
+Date: 2026-10-25. Status: implemented in [#4](https://github.com/JackBlaaack/sdet-showcase/pull/4), merged on 2026-10-25.
 
 ## Goal
 
