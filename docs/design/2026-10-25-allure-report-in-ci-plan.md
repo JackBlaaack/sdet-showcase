@@ -94,8 +94,10 @@ In `package.json` replace
 with
 
 ```json
-    "report:allure": "allure generate allure-results --config allurerc.mjs --clean",
+    "report:allure": "rm -rf allure-report/* && allure generate allure-results --config allurerc.mjs",
 ```
+
+Not `--clean`: it removes the output directory itself, and inside the container `allure-report/` is a mount point (`EBUSY: resource busy or locked, rmdir '/tests/allure-report'`). The directory still has to be emptied: Allure writes the report to `allure-report/awesome/` and moves it to the root only when that is the one report directory in the output (`@allurereport/core/dist/report.js`, `shouldFlattenOutput`), so an old report left there keeps the new one in the subdirectory.
 
 and after `"test:algo": ...,` add
 
@@ -125,8 +127,8 @@ Expected: `index.html` of about 3 MB exists, the history has 1 line; a second `d
 
 - [ ] **Step 7: Generate locally without Docker**
 
-Run: `./node_modules/.bin/allure generate allure-results --config allurerc.mjs --clean && ls allure-report/index.html`
-Expected: the file exists (proves `import { defineConfig } from 'allure'` resolves from the project and that Allure creates `allure-history/` itself). If Allure fails because `allure-history/` is missing, add `mkdir -p allure-history &&` in front of `allure generate` in `report:allure` and run again.
+Run: `PATH="$PWD/node_modules/.bin:$PATH" sh -c "$(node -p "require('./package.json').scripts['report:allure']")" && ls allure-report`
+Expected: `index.html`, `summary.json`, `test-results.json` in the root of `allure-report/`, also when an old report was there before (proves `import { defineConfig } from 'allure'` resolves from the project; Allure creates `allure-history/` itself).
 
 - [ ] **Step 8: Typecheck and commit**
 

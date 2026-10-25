@@ -3,6 +3,7 @@ playwright-report/
 test-results/
 allure-results/
 allure-report/
+allure-history/
 .git/
 .claude/
 .env

@@ -23,3 +23,5 @@ services:
       - ./playwright-report:/tests/playwright-report
       - ./test-results:/tests/test-results
       - ./allure-results:/tests/allure-results
+      - ./allure-report:/tests/allure-report
+      - ./allure-history:/tests/allure-history
