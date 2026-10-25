@@ -53,7 +53,7 @@ The application is at `http://localhost:3000` (Swagger UI at `/docs`), the payme
 | Contract tests | `GET /api/v1/orders/:id` against `GET /api/v2/orders/:id` | Planned |
 | Resilience | Payment failures and latency through the failure-injection flags, flaky-test tracking | Planned |
 | Performance | k6 scenarios: order creation against limited stock, order list under jitter | Planned |
-| CI and reporting | GitHub Actions with sharding, Allure report published to GitHub Pages | Planned |
+| CI and reporting | GitHub Actions with sharding, Allure report published to GitHub Pages | In progress: tests on every pull request and push to `main`, summary sent to Telegram |
 | Defect reports | Findings from the build with planted defects, with reproduction steps | Planned |
 
 ## Getting started
@@ -100,6 +100,27 @@ How it fits together:
 - The SUT binds ports 3000, 4000 and 5432 on the host: stop an orders-sut started on its own (`docker compose down` in its directory) before a run.
 - `playwright-report/`, `test-results/` and `allure-results/` are mounted from the host, so `pnpm report` and `pnpm report:allure` work after a run.
 - The image is `mcr.microsoft.com/playwright` with the same version as `@playwright/test`: bump the tag in `Dockerfile` together with the package.
+
+## Continuous integration
+
+`.github/workflows/tests.yml` runs both projects on every pull request to `main`, on every push to `main` and on demand (Run workflow in the Actions tab):
+
+1. Checks out this repository and orders-sut side by side, so `docker-compose.yml` finds the SUT at its default path.
+2. Runs `scripts/test-docker.sh test` against the reference build, the same command as `pnpm test:docker`.
+3. Uploads `playwright-report/` and `allure-results/` as the `reports` artifact of the run (kept 14 days).
+4. Sends a summary to Telegram with `scripts/notify-telegram.mjs`: the result, the pull request or commit, passed, failed, flaky and skipped counts, up to ten failed tests and a link to the run. It reads `test-results/results.json`, written by the JSON reporter in `playwright.config.ts`.
+
+A new commit in a pull request cancels the run for the previous one.
+
+Repository secrets (Settings → Secrets and variables → Actions):
+
+| Secret | What it is |
+| --- | --- |
+| `SUT_REPO_TOKEN` | Fine-grained personal access token with access to orders-sut only and the permission Contents: Read-only. orders-sut is private, and the token of the workflow cannot read other repositories. |
+| `TELEGRAM_BOT_TOKEN` | Token of the bot that sends the summary, from [@BotFather](https://t.me/BotFather). |
+| `TELEGRAM_CHAT_ID` | Chat the summary goes to. Send any message to the bot, then open `https://api.telegram.org/bot<token>/getUpdates` and take `message.chat.id`. |
+
+Without the Telegram secrets the summary is only printed in the log of the run, with a warning.
 
 ## Generated API code
 
