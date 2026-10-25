@@ -5,6 +5,7 @@ playwright-report/
 test-results/
 allure-results/
 allure-report/
+allure-history/
 .env
 .env.*
 .DS_Store

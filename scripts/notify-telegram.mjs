@@ -9,6 +9,8 @@
 //   HEAD_REF        branch that was tested
 //   HEAD_SHA        commit that was tested
 //   PR_NUMBER, PR_TITLE, BASE_REF   on pull_request runs only
+//   REPORT_URL      the Allure report on GitHub Pages, when it was published
+//   PUBLISH_OUTCOME outcome of the publish step: success, failure or skipped
 // The rest (GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID) comes from GitHub Actions.
 import { readFile } from 'node:fs/promises';
 
@@ -101,6 +103,17 @@ function results(report) {
   return lines;
 }
 
+function links() {
+  const run = `<a href="${runUrl}">Run, reports and traces</a>`;
+  if (env.REPORT_URL) {
+    return [`<a href="${env.REPORT_URL}">Allure report</a> · ${run}`];
+  }
+  if (env.PUBLISH_OUTCOME === 'failure') {
+    return ['⚠️ The Allure report was not published, it is in the artifact of the run', run];
+  }
+  return [run];
+}
+
 // A skipped test step wrote nothing, so a results.json on disk would be left from an older run.
 const report = env.TESTS_OUTCOME === 'skipped' ? null : await readReport();
 const text = [
@@ -109,7 +122,7 @@ const text = [
   ...trigger(),
   ...results(report),
   '',
-  `<a href="${runUrl}">Run, reports and traces</a>`,
+  ...links(),
 ].join('\n');
 
 console.log(text);
