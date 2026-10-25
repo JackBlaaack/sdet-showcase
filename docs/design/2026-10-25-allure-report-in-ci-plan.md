@@ -392,7 +392,7 @@ Expected: `# pass 8`, `# fail 0`.
 
 - [ ] **Step 5: Lint the script**
 
-Run: `docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:v0.10.0 scripts/report-site.sh`
+Run: `docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:v0.11.0 scripts/report-site.sh`
 Expected: no output, exit code 0.
 
 - [ ] **Step 6: Commit**
